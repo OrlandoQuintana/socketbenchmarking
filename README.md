@@ -39,7 +39,7 @@ Then monitor TCP buffer usage:
     
 ## What You'll See
 
-- Blocking clients cause the server's Send-Q to grow into the megabytes.
+- Blocking clients cause the server's Send-Q to grow into the kilobytes.
 
 ![Blocking Clients](python-socket-benchmark/images/clients-3blocking.png)
 
@@ -49,6 +49,7 @@ Then monitor TCP buffer usage:
 
 - Even with the same artificial delays, `asyncio` continues to read from the socket, while the blocking client does not.
 - The server stays stable with async clients, but begins choking with blocking clients.
+- This benchmark runs under moderate local load. In real-world systems with network latency, higher message rates or heavier processing, **blocking sockets can cause Send-Q to grow into the megabytes,** leading to severe backpressure, stalled connections or even server crashes if not properly mitigated.
 
 ## Conclusion
 
