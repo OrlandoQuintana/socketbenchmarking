@@ -4,8 +4,6 @@ import os
 MAGIC_WORD = b"MY_MAGIC10"  # 10 bytes exactly
 
 def build_message(payload: bytes) -> bytes:
-    if len(payload) > 2048:
-        raise ValueError("Payload too long")
     length = len(payload).to_bytes(2, byteorder='big')  # 2 bytes
     return MAGIC_WORD + length + payload
 
@@ -15,7 +13,7 @@ async def handle_relay(reader, writer):
 
     try:
         while True:
-            payload = os.urandom(2048)  
+            payload = os.urandom(20480)  
             message = build_message(payload)
             writer.write(message)
             await writer.drain()

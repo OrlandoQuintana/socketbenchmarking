@@ -11,7 +11,7 @@ async def read_loop(reader: asyncio.StreamReader, shared_queue: asyncio.Queue):
     buffer = bytearray()
 
     while True:
-        data = await reader.read(20480)
+        data = await reader.read(2048)
         if not data:
             print("Upstream server closed connection.")
             break

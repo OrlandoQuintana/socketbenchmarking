@@ -11,7 +11,7 @@ async def downstream_client():
 
     try:
         while True:
-            data = await reader.read(20480)
+            data = await reader.read(2048)
             if not data:
                 print("[!] Relay closed connection.")
                 break
@@ -42,7 +42,7 @@ async def downstream_client():
                 print(f"[<] Message:")
                 print(f"    Magic Word: {full_message[:10].decode(errors='replace')}")
                 print(f"    Length: {payload_len} bytes")
-                print(f"    Payload (hex): {payload.hex()}\n")
+                #print(f"    Payload (hex): {payload.hex()}\n")
 
                 del buffer[:total_len]
     finally:
