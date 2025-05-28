@@ -8,7 +8,4 @@ In another terminal, run:
 
 In another terminal, run:
 
-    nc 127.0.0.1 5558
-    
-You should see the message from the upstream server relayed every second.
-    
+    python3 downstream_client.py
