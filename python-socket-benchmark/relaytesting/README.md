@@ -309,3 +309,24 @@ if __name__ == "__main__":
         asyncio.run(run())
     except KeyboardInterrupt:
         print("\n[!] Relay stopped by user.")
+
+
+
+
+
+
+
+
+
+or
+
+
+
+
+
+def find_magic_index(buffer: bytearray, magic_word: int, mask: int) -> int:
+    for i in range(len(buffer) - 3):
+        candidate = int.from_bytes(buffer[i:i+4], byteorder='big')
+        if (candidate & mask) == magic_word:
+            return i
+    return -1
