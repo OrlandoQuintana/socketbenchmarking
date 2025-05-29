@@ -1,4 +1,4 @@
-Run this in one terminal:
+uRun this in one terminal:
 
     python3 upstream_server.py
 
@@ -178,3 +178,134 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n[!] Relay shut down.")
+
+
+
+
+
+
+
+
+or
+
+
+
+
+
+
+
+
+
+import asyncio
+
+connected_clients = {}  # writer -> client_queue
+
+MAGIC_WORD = b"\x01\x00\x48\x40"  # Just an example 4-byte sequence (edit as needed)
+MAGIC_MASK = 0xFFFFFFC0           # Top 26 bits must match
+MESSAGE_SIZE = 1034               # Full message length (header + payload)
+
+# Reads from upstream, extracts full messages based on masked magic word
+async def read_loop(reader: asyncio.StreamReader, shared_queue: asyncio.Queue):
+    buffer = bytearray()
+
+    while True:
+        data = await reader.read(2048)
+        if not data:
+            print("[!] Upstream server closed connection.")
+            break
+
+        buffer.extend(data)
+
+        while True:
+            if len(buffer) < 4:
+                break
+
+            found = False
+            for i in range(len(buffer) - 3):
+                candidate = int.from_bytes(buffer[i:i+4], 'big')
+                magic_val = int.from_bytes(MAGIC_WORD, 'big')
+
+                if (candidate & MAGIC_MASK) == (magic_val & MAGIC_MASK):
+                    # Found candidate magic
+                    if len(buffer) - i >= MESSAGE_SIZE:
+                        message = bytes(buffer[i:i+MESSAGE_SIZE])
+                        await shared_queue.put(message)
+                        del buffer[:i+MESSAGE_SIZE]
+                        found = True
+                        break
+                    else:
+                        # Wait for more bytes
+                        if i > 0:
+                            del buffer[:i]  # trim junk before possible start
+                        found = True
+                        break
+
+            if not found:
+                # Trim buffer if it’s growing too large with no match
+                if len(buffer) > 4096:
+                    del buffer[:-4]
+                break
+
+# Handles a newly connected downstream client
+async def handle_client(reader, writer):
+    peer = writer.get_extra_info("peername")
+    print(f"[+] Client connected: {peer}")
+
+    client_queue = asyncio.Queue(maxsize=64)
+    connected_clients[writer] = client_queue
+
+    writer_task = asyncio.create_task(client_writer_loop(writer, client_queue))
+
+    try:
+        await reader.read(1)
+    except Exception:
+        pass
+    finally:
+        print(f"[-] Client disconnected: {peer}")
+        writer_task.cancel()
+        del connected_clients[writer]
+        writer.close()
+        await writer.wait_closed()
+
+# Writes data from a client's personal queue to their socket
+async def client_writer_loop(writer, queue):
+    try:
+        while True:
+            data = await queue.get()
+            writer.write(data)
+            await writer.drain()
+    except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError):
+        pass
+
+# Relay loop: distributes upstream data to all connected clients
+async def process_loop(shared_queue):
+    server = await asyncio.start_server(handle_client, "127.0.0.1", 5558)
+
+    async with server:
+        print("[*] Relay server started on 127.0.0.1:5558")
+        while True:
+            data = await shared_queue.get()
+            for writer, q in list(connected_clients.items()):
+                try:
+                    await q.put(data)
+                except Exception:
+                    print(f"[!] Client write error: {writer.get_extra_info('peername')}")
+
+# Startup
+async def run():
+    print("[*] Connecting to upstream server at 127.0.0.1:5557...")
+    reader, _ = await asyncio.open_connection("127.0.0.1", 5557)
+    print("[+] Connected to upstream.")
+
+    shared_queue = asyncio.Queue(maxsize=128)
+
+    await asyncio.gather(
+        read_loop(reader, shared_queue),
+        process_loop(shared_queue)
+    )
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(run())
+    except KeyboardInterrupt:
+        print("\n[!] Relay stopped by user.")
